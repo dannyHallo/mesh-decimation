@@ -1,35 +1,32 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 19,
-    "patch": 0
-  },
+  "version": 8,
   "configurePresets": [
     {
-      "name": "Debug",
-      "description": "Debug configuration",
+      "name": "base",
       "hidden": false,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/Debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
         "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_STANDARD": "20"
       }
     },
     {
-      "name": "Release",
-      "description": "Release configuration",
-      "hidden": false,
-      "generator": "Ninja",
+      "name": "debug",
+      "inherits": ["base"],
+      "binaryDir": "${sourceDir}/build/Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "debug"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": ["base"],
       "binaryDir": "${sourceDir}/build/Release",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "YES",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++"
+        "CMAKE_BUILD_TYPE": "release"
       }
     }
   ]

@@ -1,6 +1,4 @@
 {
-  "name": "learndaxa",
-  "version": "1.0.0",
   "builtin-baseline": "ce46ba8777d8f899d8dc11afefb8eca39293df39",
   "dependencies": [
     {
@@ -16,16 +14,7 @@
     "glfw3",
     {
       "name": "imgui",
-      "features": [
-        "glfw-binding",
-        "docking-experimental"
-      ]
+      "features": ["glfw-binding", "docking-experimental"]
     }
-  ],
-  "vcpkg-configuration": {
-    "overlay-ports": [
-      "lib/daxa",
-      "lib/daxa/cmake/vcpkg-overlay-ports/glfw3"
-    ]
-  }
+  ]
 }
