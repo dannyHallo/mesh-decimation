@@ -3,7 +3,7 @@ add_library(src-window STATIC
 )
 
 target_include_directories(src-window PRIVATE
-    ${vcpkg_INCLUDE_DIR}
+    ${dep_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src/
 )
 

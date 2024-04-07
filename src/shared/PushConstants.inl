@@ -1,9 +1,10 @@
 #pragma once
 
-#include <daxa/daxa.inl>
+#include "daxa/daxa.inl"
 
 struct MyVertex {
   daxa_f32vec3 position;
+  daxa_f32vec2 texCoord;
   daxa_f32vec3 color;
 };
 

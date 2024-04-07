@@ -50,5 +50,7 @@ private:
   void _createUploadTaskGraph();
   void _createRenderTaskGraph();
 
+  void _loadModel();
+
   void _createCommandBuffers();
 };

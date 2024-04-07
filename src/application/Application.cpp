@@ -2,6 +2,7 @@
 
 #include "window/Window.hpp"
 
+#include "obj-loader/ObjectLoader.hpp"
 #include "shared/PushConstants.inl"
 
 #include <iostream>
@@ -10,7 +11,7 @@ using namespace daxa::types;
 
 struct UploadVertexDataTask {
   struct Uses {
-    daxa::BufferTransferWrite vertex_buffer{};
+    daxa::BufferTransferWrite vertexBuffer{};
   } uses = {};
 
   std::string_view name = "upload vertices";
@@ -23,21 +24,20 @@ struct UploadVertexDataTask {
         MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
     };
 
-    auto staging_buffer_id = ti.get_device().create_buffer({
+    auto stagingBufferId = ti.get_device().create_buffer({
         .size          = sizeof(data),
         .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
         .name          = "my staging buffer",
     });
 
-    commandList.destroy_buffer_deferred(staging_buffer_id);
+    commandList.destroy_buffer_deferred(stagingBufferId);
 
-    auto *buffer_ptr =
-        ti.get_device().get_host_address_as<std::array<MyVertex, 3>>(staging_buffer_id);
+    auto *bufferPtr = ti.get_device().get_host_address_as<std::array<MyVertex, 3>>(stagingBufferId);
 
-    *buffer_ptr = data;
+    *bufferPtr = data;
     commandList.copy_buffer_to_buffer({
-        .src_buffer = staging_buffer_id,
-        .dst_buffer = uses.vertex_buffer.buffer(),
+        .src_buffer = stagingBufferId,
+        .dst_buffer = uses.vertexBuffer.buffer(),
         .size       = sizeof(data),
     });
   }
@@ -217,7 +217,7 @@ void Application::_createUploadTaskGraph() {
   _uploadTaskGraph.add_task(UploadVertexDataTask{
       .uses =
           {
-              .vertex_buffer = _taskVertexBuffer.view(),
+              .vertexBuffer = _taskVertexBuffer.view(),
           },
   });
 
@@ -253,8 +253,20 @@ void Application::_createRenderTaskGraph() {
   _renderTaskGraph.complete({});
 }
 
+void Application::_loadModel() {
+  auto model = ObjectLoader::loadObjModel(
+      "C:/Users/danny/Desktop/mesh-decimation/resources/viking_room.obj");
+
+  // print its stats
+  std::cout << "Model has " << model.vertices.size() << " vertices and " << model.indices.size()
+            << " indices." << std::endl;
+}
+
 Application::Application() : _window(std::make_unique<Window>("Mesh Decimation Test", 860, 640)) {
   _init();
+
+  // testing
+  _loadModel();
 
   _createTaskGraphs();
 
@@ -275,9 +287,8 @@ Application::Application() : _window(std::make_unique<Window>("Mesh Decimation T
     }
 
     // We update the image id of the task swapchain image.
-    _taskSwapchainImage.set_images({.images = std::span{&swapchain_image, 1}});
+    _taskSwapchainImage.set_images(daxa::TrackedImages{.images = std::span{&swapchain_image, 1}});
 
-    // So, now all we need to do is execute our task graph!
     _renderTaskGraph.execute({});
     _device.collect_garbage();
   }

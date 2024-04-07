@@ -1,7 +1,7 @@
 add_executable(run main.cpp)
 
 target_include_directories(run PRIVATE
-    ${vcpkg_INCLUDE_DIR}
+    ${dep_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src/
 )
 
