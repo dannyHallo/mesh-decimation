@@ -12,6 +12,7 @@
       ]
     },
     "glfw3",
+    "glm",
     {
       "name": "imgui",
       "features": ["glfw-binding", "docking-experimental"]

@@ -29,11 +29,21 @@ Window::Window(char const *window_name, uint32_t sx, uint32_t sy) : _width{sx}, 
         win->_height             = static_cast<uint32_t>(yscale);
         win->_swapchainOutOfDate = true;
       });
+
+  glfwSetKeyCallback(_glfwWindowPtr, _keyCallback);
 }
 
 Window::~Window() {
   glfwDestroyWindow(_glfwWindowPtr);
   glfwTerminate();
+}
+
+void Window::_keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/) {
+  auto *thisWindowClass = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+
+  if (action == GLFW_PRESS || action == GLFW_RELEASE) {
+    thisWindowClass->_keyInputMap[key] = action == GLFW_PRESS;
+  }
 }
 
 daxa::NativeWindowHandle Window::getNativeHandle() const {

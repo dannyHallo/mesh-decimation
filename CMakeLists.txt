@@ -6,6 +6,9 @@ project(mesh-decimation)
 # glfw
 find_package(glfw3 CONFIG REQUIRED)
 
+# glm
+find_package(glm CONFIG REQUIRED)
+
 # daxa::daxa
 find_package(daxa CONFIG REQUIRED)
 
