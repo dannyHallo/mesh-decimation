@@ -2,10 +2,6 @@
 
 #include "window/Window.hpp"
 
-#include <daxa/daxa.hpp>
-#include <daxa/utils/pipeline_manager.hpp>
-#include <daxa/utils/task_graph.hpp>
-
 #include "shared/PushConstants.inl"
 
 #include <iostream>
@@ -95,14 +91,19 @@ struct DrawToSwapchainTask {
   }
 };
 
-Application::Application() {
-  // Create a window
-  auto window = Window("Learn Daxa", 860, 640);
+void Application::_init() {
+  _createInstance();
+  _createDevice();
+  _createSwapchain();
+  _createPipelineManager();
+  _createRasterPipeline();
+  _createBuffers();
+}
 
-  // Daxa code goes here...
-  daxa::Instance instance = daxa::create_instance({});
+void Application::_createInstance() { _instance = daxa::create_instance({}); }
 
-  daxa::Device device = instance.create_device({
+void Application::_createDevice() {
+  _device = _instance.create_device({
       .selector = [](daxa::DeviceProperties const &device_props) -> daxa::i32 {
         daxa::i32 score = 0;
         switch (device_props.device_type) {
@@ -124,10 +125,12 @@ Application::Application() {
       },
       .name = "my device",
   });
+}
 
-  daxa::Swapchain swapchain = device.create_swapchain(daxa::SwapchainInfo{
+void Application::_createSwapchain() {
+  _swapchain = _device.create_swapchain(daxa::SwapchainInfo{
       // this handle is given by the windowing API
-      .native_window = window.getNativeHandle(),
+      .native_window = _window->getNativeHandle(),
 
       // The platform would also be retrieved from the windowing API,
       // or by hard-coding it depending on the OS.
@@ -150,9 +153,11 @@ Application::Application() {
       .image_usage = daxa::ImageUsageFlagBits::TRANSFER_DST,
       .name = "my swapchain",
   });
+}
 
-  auto pipeline_manager = daxa::PipelineManager({
-      .device = device,
+void Application::_createPipelineManager() {
+  _pipeline_manager = daxa::PipelineManager(daxa::PipelineManagerInfo{
+      .device = _device,
       .shader_compile_options =
           {
               .root_paths =
@@ -166,42 +171,48 @@ Application::Application() {
           },
       .name = "my pipeline manager",
   });
+}
 
-  std::shared_ptr<daxa::RasterPipeline> pipeline;
-  {
-    auto result = pipeline_manager.add_raster_pipeline({
-        .vertex_shader_info =
-            daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
-        .fragment_shader_info =
-            daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
-        .color_attachments = {{.format = swapchain.get_format()}},
-        .raster = {},
-        .push_constant_size = sizeof(MyPushConstant),
-        .name = "my pipeline",
-    });
-    if (result.is_err()) {
-      std::cerr << result.message() << std::endl;
-      return;
-    }
-    pipeline = result.value();
+void Application::_createRasterPipeline() {
+  auto result = _pipeline_manager.add_raster_pipeline({
+      .vertex_shader_info =
+          daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
+      .fragment_shader_info =
+          daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
+      .color_attachments = {{.format = _swapchain.get_format()}},
+      .raster = {},
+      .push_constant_size = sizeof(MyPushConstant),
+      .name = "my pipeline",
+  });
+  if (result.is_err()) {
+    std::cerr << result.message() << std::endl;
+    return;
   }
+  _raster_pipeline = result.value();
+}
 
-  auto buffer_id = device.create_buffer({
+void Application::_createBuffers() {
+  _vertex_buffer_id = _device.create_buffer({
       .size = sizeof(MyVertex) * 3,
       .name = "my vertex data",
   });
+}
+
+Application::Application()
+    : _window(std::make_unique<Window>("Learn Daxa", 860, 640)) {
+  _init();
 
   auto task_swapchain_image =
       daxa::TaskImage{{.swapchain_image = true, .name = "swapchain image"}};
 
   auto task_vertex_buffer = daxa::TaskBuffer({
-      .initial_buffers = {.buffers = std::span{&buffer_id, 1}},
+      .initial_buffers = {.buffers = std::span{&_vertex_buffer_id, 1}},
       .name = "task vertex buffer",
   });
 
   auto loop_task_graph = daxa::TaskGraph({
-      .device = device,
-      .swapchain = swapchain,
+      .device = _device,
+      .swapchain = _swapchain,
       .name = "loop",
   });
 
@@ -214,7 +225,7 @@ Application::Application() {
               .vertex_buffer = task_vertex_buffer.view(),
               .color_target = task_swapchain_image.view(),
           },
-      .pipeline = pipeline.get(),
+      .pipeline = _raster_pipeline.get(),
   });
 
   loop_task_graph.submit({});
@@ -228,7 +239,7 @@ Application::Application() {
   // creating a vertex uploading graph
   {
     auto upload_task_graph = daxa::TaskGraph({
-        .device = device,
+        .device = _device,
         .name = "upload",
     });
 
@@ -247,16 +258,16 @@ Application::Application() {
     upload_task_graph.execute({});
   }
 
-  while (!window.shouldClose()) {
-    window.update();
+  while (!_window->shouldClose()) {
+    _window->update();
 
-    if (window.swapchain_out_of_date) {
-      swapchain.resize();
-      window.swapchain_out_of_date = false;
+    if (_window->swapchain_out_of_date) {
+      _swapchain.resize();
+      _window->swapchain_out_of_date = false;
     }
 
     // acquire the next image
-    auto swapchain_image = swapchain.acquire_next_image();
+    auto swapchain_image = _swapchain.acquire_next_image();
     if (swapchain_image.is_empty()) {
       continue;
     }
@@ -266,12 +277,12 @@ Application::Application() {
 
     // So, now all we need to do is execute our task graph!
     loop_task_graph.execute({});
-    device.collect_garbage();
+    _device.collect_garbage();
   }
 
-  device.wait_idle();
-  device.collect_garbage();
-  device.destroy_buffer(buffer_id);
+  _device.wait_idle();
+  _device.collect_garbage();
+  _device.destroy_buffer(_vertex_buffer_id);
 }
 
 Application::~Application() = default;
