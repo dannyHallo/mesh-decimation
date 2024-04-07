@@ -1,5 +1,7 @@
 #include "Camera.hpp"
 
+#include <iostream>
+
 namespace {
 
 float constexpr kMovementSpeed    = .2F;
@@ -7,8 +9,13 @@ float constexpr kMouseSensitivity = 0.06F;
 
 } // namespace
 
+glm::mat4 Camera::getViewMatrix() const {
+  auto mat = glm::lookAt(_position, _position + _front, _up);
+  return mat;
+}
+
 glm::mat4 Camera::getProjectionMatrix(float aspectRatio, float zNear, float zFar) const {
-  glm::mat4 projection =
+  auto mat =
       glm::perspective(glm::radians(_fov), // The vertical Field of View, in radians: the amount
                                            // of "zoom". Think "camera lens". Usually between
                                            // 90° (extra wide) and 30° (quite zoomed in)
@@ -17,7 +24,7 @@ glm::mat4 Camera::getProjectionMatrix(float aspectRatio, float zNear, float zFar
                               // precision issues.
                        zFar   // Far clipping plane. Keep as little as possible.
       );
-  return projection;
+  return mat;
 }
 
 void Camera::processInput(double deltaTime) {
@@ -73,7 +80,7 @@ void Camera::handleMouseMovement(float xoffset, float yoffset) {
   // }
 
   xoffset *= -kMouseSensitivity;
-  yoffset *= kMouseSensitivity;
+  yoffset *= -kMouseSensitivity;
 
   _yaw += xoffset;
   _pitch += yoffset;
@@ -87,7 +94,6 @@ void Camera::handleMouseMovement(float xoffset, float yoffset) {
     _pitch = -cameraLim;
   }
 
-  // update Front, Right and Up Vectors using the updated Euler angles
   _updateCameraVectors();
 }
 

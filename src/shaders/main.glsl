@@ -16,7 +16,10 @@ layout(location = 0) out daxa_f32vec3 v_col;
 void main()
 {
     MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
-    gl_Position = daxa_f32vec4(vert.position, 1);
+    
+    MyCameraTransform transform = deref(push.my_camera_transform_ptr);
+    
+    gl_Position = transform.vpMat * daxa_f32vec4(vert.position, 1);
     v_col = vert.color;
 }
 

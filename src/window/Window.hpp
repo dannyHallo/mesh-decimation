@@ -10,7 +10,10 @@ using HWND = void *;
 
 #include "GLFW/glfw3native.h"
 
+#include <functional>
 #include <unordered_map>
+
+enum class CursorState { kNone, kInvisible, kVisible };
 
 class Window {
 public:
@@ -39,6 +42,12 @@ public:
 
   void disableInputBit(int bitToBeDisabled) { _keyInputMap[bitToBeDisabled] = false; }
 
+  void addMouseCallback(std::function<void(float, float)> callback);
+
+  void showCursor();
+  void hideCursor();
+  void toggleCursor();
+
 private:
   GLFWwindow *_glfwWindowPtr;
   uint32_t _width;
@@ -47,5 +56,13 @@ private:
   bool _swapchainOutOfDate = false;
   std::unordered_map<int, bool> _keyInputMap;
 
+  float _mouseDeltaX = 0;
+  float _mouseDeltaY = 0;
+
+  CursorState _cursorState = CursorState::kInvisible;
+
+  std::vector<std::function<void(float, float)>> _mouseCallbacks;
+
   static void _keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
+  static void _cursorPosCallback(GLFWwindow *window, double xPos, double yPos);
 };

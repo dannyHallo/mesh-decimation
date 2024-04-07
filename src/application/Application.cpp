@@ -2,12 +2,24 @@
 
 #include "window/Window.hpp"
 
+#include "camera/Camera.hpp"
 #include "obj-loader/ObjectLoader.hpp"
 #include "shared/PushConstants.inl"
 
+#include <chrono>
 #include <iostream>
 
 using namespace daxa::types;
+
+namespace {
+daxa::types::f32mat4x4 toDaxaMat4x4(glm::mat4 const &mat) {
+  return daxa::types::f32mat4x4{mat[0][0], mat[0][1], mat[0][2], mat[0][3], //
+                                mat[1][0], mat[1][1], mat[1][2], mat[1][3], //
+                                mat[2][0], mat[2][1], mat[2][2], mat[2][3], //
+                                mat[3][0], mat[3][1], mat[3][2], mat[3][3]};
+}
+
+} // namespace
 
 struct UploadVertexDataTask {
   struct Uses {
@@ -45,9 +57,13 @@ struct UploadVertexDataTask {
 
 struct DrawToSwapchainTask {
   struct Uses {
+    Camera *camera;
+
     // We declare a vertex buffer read. Later we assign the task vertex buffer
     // handle to this use.
     daxa::BufferVertexShaderRead vertex_buffer{};
+    daxa::BufferVertexShaderRead camera_transform_buffer{};
+
     // We declare a color target. We will assign the swapchain task image to
     // this later. The name `ImageColorAttachment<T_VIEW_TYPE = DEFAULT>` is a
     // typedef for
@@ -62,6 +78,31 @@ struct DrawToSwapchainTask {
 
   void callback(daxa::TaskInterface ti) {
     auto commandList = ti.get_command_list();
+
+    // TODO: fix me
+    auto pMat  = uses.camera->getProjectionMatrix(860.0f / 640.0f);
+    auto vMat  = uses.camera->getViewMatrix();
+    auto vpMat = pMat * vMat;
+    // auto vpMat = glm::mat4(1.0f);
+
+    auto data = MyCameraTransform{.vpMat = toDaxaMat4x4(vpMat)};
+
+    auto stagingBufferId = ti.get_device().create_buffer({
+        .size          = sizeof(data),
+        .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+        .name          = "my staging buffer",
+    });
+
+    commandList.destroy_buffer_deferred(stagingBufferId);
+
+    auto *bufferPtr = ti.get_device().get_host_address_as<MyCameraTransform>(stagingBufferId);
+
+    *bufferPtr = data;
+    commandList.copy_buffer_to_buffer({
+        .src_buffer = stagingBufferId,
+        .dst_buffer = uses.camera_transform_buffer.buffer(),
+        .size       = sizeof(data),
+    });
 
     auto const size_x = ti.get_device().info_image(uses.color_target.image()).size.x;
     auto const size_y = ti.get_device().info_image(uses.color_target.image()).size.y;
@@ -80,8 +121,11 @@ struct DrawToSwapchainTask {
 
     commandList.set_pipeline(*pipeline);
     commandList.push_constant(MyPushConstant{
-        .my_vertex_ptr = ti.get_device().get_device_address(uses.vertex_buffer.buffer())});
-    commandList.draw({.vertex_count = 3});
+        .my_vertex_ptr = ti.get_device().get_device_address(uses.vertex_buffer.buffer()),
+        .my_camera_transform_ptr =
+            ti.get_device().get_device_address(uses.camera_transform_buffer.buffer())});
+
+    commandList.draw(daxa::DrawInfo{.vertex_count = 3});
     commandList.end_renderpass();
   }
 };
@@ -188,6 +232,11 @@ void Application::_createBuffers() {
       .size = sizeof(MyVertex) * 3,
       .name = "my vertex data",
   });
+
+  _cameraTransformBufferId = _device.create_buffer({
+      .size = sizeof(MyCameraTransform),
+      .name = "my camera transform",
+  });
 }
 
 void Application::_createTaskGraphs() {
@@ -203,6 +252,11 @@ void Application::_createTaskResources() {
   _taskVertexBuffer = daxa::TaskBuffer({
       .initial_buffers = {.buffers = std::span{&_vertexBufferId, 1}},
       .name            = "task vertex buffer",
+  });
+
+  _taskCameraTransformBuffer = daxa::TaskBuffer({
+      .initial_buffers = {.buffers = std::span{&_cameraTransformBufferId, 1}},
+      .name            = "task camera transform buffer",
   });
 }
 
@@ -233,13 +287,16 @@ void Application::_createRenderTaskGraph() {
   });
 
   _renderTaskGraph.use_persistent_buffer(_taskVertexBuffer);
+  _renderTaskGraph.use_persistent_buffer(_taskCameraTransformBuffer);
   _renderTaskGraph.use_persistent_image(_taskSwapchainImage);
 
   _renderTaskGraph.add_task(DrawToSwapchainTask{
       .uses =
           {
-              .vertex_buffer = _taskVertexBuffer.view(),
-              .color_target  = _taskSwapchainImage.view(),
+              .camera                  = _camera.get(),
+              .vertex_buffer           = _taskVertexBuffer.view(),
+              .camera_transform_buffer = _taskCameraTransformBuffer.view(),
+              .color_target            = _taskSwapchainImage.view(),
           },
       .pipeline = _rasterPipeline.get(),
   });
@@ -263,17 +320,38 @@ void Application::_loadModel() {
 }
 
 Application::Application() : _window(std::make_unique<Window>("Mesh Decimation Test", 860, 640)) {
+  _camera = std::make_unique<Camera>(_window.get());
+
+  _window->addMouseCallback([this](float mouseDeltaX, float mouseDeltaY) {
+    _camera->handleMouseMovement(mouseDeltaX, mouseDeltaY);
+  });
+
   _init();
 
   // testing
   _loadModel();
 
   _createTaskGraphs();
+}
+
+Application::~Application() {
+  _device.destroy_buffer(_vertexBufferId);
+  _device.destroy_buffer(_cameraTransformBufferId);
+}
+
+void Application::run() {
+  static std::chrono::time_point fpsRecordLastTime = std::chrono::steady_clock::now();
 
   _uploadTaskGraph.execute({});
 
   while (!_window->shouldClose()) {
     _window->update();
+
+    auto now = std::chrono::steady_clock::now();
+    auto delta =
+        std::chrono::duration_cast<std::chrono::duration<double>>(now - fpsRecordLastTime).count();
+    fpsRecordLastTime = now;
+    _camera->processInput(delta);
 
     if (_window->getSwapchainOutOfDate()) {
       _swapchain.resize();
@@ -295,9 +373,4 @@ Application::Application() : _window(std::make_unique<Window>("Mesh Decimation T
 
   _device.wait_idle();
   _device.collect_garbage();
-  _device.destroy_buffer(_vertexBufferId);
 }
-
-Application::~Application() = default;
-
-void Application::run() { std::cout << "Hello, World!" << std::endl; }

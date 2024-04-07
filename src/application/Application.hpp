@@ -7,6 +7,7 @@
 #include <memory>
 
 class Window;
+class Camera;
 
 class Application {
 public:
@@ -23,6 +24,7 @@ public:
 
 private:
   std::unique_ptr<Window> _window;
+  std::unique_ptr<Camera> _camera;
 
   daxa::Instance _instance;
   daxa::Device _device;
@@ -31,9 +33,12 @@ private:
   std::shared_ptr<daxa::RasterPipeline> _rasterPipeline;
 
   daxa::BufferId _vertexBufferId;
+  daxa::BufferId _cameraTransformBufferId;
 
   daxa::TaskImage _taskSwapchainImage;
   daxa::TaskBuffer _taskVertexBuffer;
+  daxa::TaskBuffer _taskCameraTransformBuffer;
+
   daxa::TaskGraph _uploadTaskGraph;
   daxa::TaskGraph _renderTaskGraph;
 

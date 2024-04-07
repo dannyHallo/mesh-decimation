@@ -31,6 +31,9 @@ Window::Window(char const *window_name, uint32_t sx, uint32_t sy) : _width{sx}, 
       });
 
   glfwSetKeyCallback(_glfwWindowPtr, _keyCallback);
+  glfwSetCursorPosCallback(_glfwWindowPtr, _cursorPosCallback);
+
+  hideCursor();
 }
 
 Window::~Window() {
@@ -38,11 +41,61 @@ Window::~Window() {
   glfwTerminate();
 }
 
+void Window::showCursor() {
+  glfwSetInputMode(_glfwWindowPtr, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+  _cursorState = CursorState::kVisible;
+  glfwSetCursorPos(_glfwWindowPtr, static_cast<float>(_width) / 2.F,
+                   static_cast<float>(_height) / 2.F);
+}
+
+void Window::hideCursor() {
+  glfwSetInputMode(_glfwWindowPtr, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+  if (glfwRawMouseMotionSupported() != 0) {
+    glfwSetInputMode(_glfwWindowPtr, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+  }
+
+  _cursorState = CursorState::kInvisible;
+}
+
+void Window::addMouseCallback(std::function<void(float, float)> callback) {
+  _mouseCallbacks.emplace_back(std::move(callback));
+}
+
 void Window::_keyCallback(GLFWwindow *window, int key, int /*scancode*/, int action, int /*mods*/) {
   auto *thisWindowClass = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
 
   if (action == GLFW_PRESS || action == GLFW_RELEASE) {
     thisWindowClass->_keyInputMap[key] = action == GLFW_PRESS;
+  }
+}
+
+void Window::_cursorPosCallback(GLFWwindow *window, double xpos, double ypos) {
+  auto *thisWindowClass = reinterpret_cast<Window *>(glfwGetWindowUserPointer(window));
+
+  static float lastX;
+  static float lastY;
+  static bool firstMouse = true;
+
+  if (firstMouse) {
+    lastX      = static_cast<float>(xpos);
+    lastY      = static_cast<float>(ypos);
+    firstMouse = false;
+  }
+
+  thisWindowClass->_mouseDeltaX = static_cast<float>(xpos) - lastX;
+  // inverted y axis
+  thisWindowClass->_mouseDeltaY = lastY - static_cast<float>(ypos);
+
+  lastX = static_cast<float>(xpos);
+  lastY = static_cast<float>(ypos);
+
+  if (thisWindowClass->_mouseCallbacks.empty()) {
+    return;
+  }
+
+  for (auto &callback : thisWindowClass->_mouseCallbacks) {
+    callback(thisWindowClass->_mouseDeltaX, thisWindowClass->_mouseDeltaY);
   }
 }
 
