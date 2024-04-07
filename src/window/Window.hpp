@@ -10,13 +10,9 @@ using HWND = void *;
 
 #include <GLFW/glfw3native.h>
 
-struct Window {
-  GLFWwindow *glfw_window_ptr;
-  u32 width, height;
-  bool minimized             = false;
-  bool swapchain_out_of_date = false;
-
-  explicit Window(char const *window_name, u32 sx = 800, u32 sy = 600);
+class Window {
+public:
+  Window(char const *window_name, uint32_t sx = 800, uint32_t sy = 600);
 
   ~Window();
 
@@ -31,4 +27,14 @@ struct Window {
   GLFWwindow *getGlfwWindow() const;
 
   bool shouldClose();
+
+  bool getSwapchainOutOfDate() const { return _swapchainOutOfDate; }
+  void setSwapchainOutOfDate(bool value) { _swapchainOutOfDate = value; }
+
+private:
+  GLFWwindow *_glfwWindowPtr;
+  uint32_t _width;
+  uint32_t _height;
+  bool _minimized          = false;
+  bool _swapchainOutOfDate = false;
 };

@@ -27,10 +27,15 @@ private:
   daxa::Instance _instance;
   daxa::Device _device;
   daxa::Swapchain _swapchain;
-  daxa::PipelineManager _pipeline_manager;
-  std::shared_ptr<daxa::RasterPipeline> _raster_pipeline;
+  daxa::PipelineManager _pipelineManager;
+  std::shared_ptr<daxa::RasterPipeline> _rasterPipeline;
 
-  daxa::BufferId _vertex_buffer_id;
+  daxa::BufferId _vertexBufferId;
+
+  daxa::TaskImage _taskSwapchainImage;
+  daxa::TaskBuffer _taskVertexBuffer;
+  daxa::TaskGraph _uploadTaskGraph;
+  daxa::TaskGraph _renderTaskGraph;
 
   void _init();
   void _createInstance();
@@ -39,6 +44,11 @@ private:
   void _createPipelineManager();
   void _createRasterPipeline();
   void _createBuffers();
+
+  void _createTaskGraphs();
+  void _createTaskResources();
+  void _createUploadTaskGraph();
+  void _createRenderTaskGraph();
 
   void _createCommandBuffers();
 };

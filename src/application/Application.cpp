@@ -150,7 +150,7 @@ void Application::_createSwapchain() {
 }
 
 void Application::_createPipelineManager() {
-  _pipeline_manager = daxa::PipelineManager(daxa::PipelineManagerInfo{
+  _pipelineManager = daxa::PipelineManager(daxa::PipelineManagerInfo{
       .device = _device,
       .shader_compile_options =
           {
@@ -168,7 +168,7 @@ void Application::_createPipelineManager() {
 }
 
 void Application::_createRasterPipeline() {
-  auto result = _pipeline_manager.add_raster_pipeline({
+  auto result = _pipelineManager.add_raster_pipeline({
       .vertex_shader_info   = daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
       .fragment_shader_info = daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
       .color_attachments    = {{.format = _swapchain.get_format()}},
@@ -180,81 +180,92 @@ void Application::_createRasterPipeline() {
     std::cerr << result.message() << std::endl;
     return;
   }
-  _raster_pipeline = result.value();
+  _rasterPipeline = result.value();
 }
 
 void Application::_createBuffers() {
-  _vertex_buffer_id = _device.create_buffer({
+  _vertexBufferId = _device.create_buffer({
       .size = sizeof(MyVertex) * 3,
       .name = "my vertex data",
   });
 }
 
-Application::Application() : _window(std::make_unique<Window>("Learn Daxa", 860, 640)) {
-  _init();
+void Application::_createTaskGraphs() {
+  _createTaskResources();
+  _createUploadTaskGraph();
+  _createRenderTaskGraph();
+}
 
-  auto task_swapchain_image =
+void Application::_createTaskResources() {
+  _taskSwapchainImage =
       daxa::TaskImage{daxa::TaskImageInfo{.swapchain_image = true, .name = "swapchain image"}};
 
-  auto task_vertex_buffer = daxa::TaskBuffer({
-      .initial_buffers = {.buffers = std::span{&_vertex_buffer_id, 1}},
+  _taskVertexBuffer = daxa::TaskBuffer({
+      .initial_buffers = {.buffers = std::span{&_vertexBufferId, 1}},
       .name            = "task vertex buffer",
   });
+}
 
-  auto loop_task_graph = daxa::TaskGraph({
+void Application::_createUploadTaskGraph() {
+  _uploadTaskGraph = daxa::TaskGraph({
+      .device = _device,
+      .name   = "upload",
+  });
+
+  _uploadTaskGraph.use_persistent_buffer(_taskVertexBuffer);
+
+  _uploadTaskGraph.add_task(UploadVertexDataTask{
+      .uses =
+          {
+              .vertex_buffer = _taskVertexBuffer.view(),
+          },
+  });
+
+  _uploadTaskGraph.submit({});
+  _uploadTaskGraph.complete({});
+}
+
+void Application::_createRenderTaskGraph() {
+  _renderTaskGraph = daxa::TaskGraph({
       .device    = _device,
       .swapchain = _swapchain,
       .name      = "loop",
   });
 
-  loop_task_graph.use_persistent_buffer(task_vertex_buffer);
-  loop_task_graph.use_persistent_image(task_swapchain_image);
+  _renderTaskGraph.use_persistent_buffer(_taskVertexBuffer);
+  _renderTaskGraph.use_persistent_image(_taskSwapchainImage);
 
-  loop_task_graph.add_task(DrawToSwapchainTask{
+  _renderTaskGraph.add_task(DrawToSwapchainTask{
       .uses =
           {
-              .vertex_buffer = task_vertex_buffer.view(),
-              .color_target  = task_swapchain_image.view(),
+              .vertex_buffer = _taskVertexBuffer.view(),
+              .color_target  = _taskSwapchainImage.view(),
           },
-      .pipeline = _raster_pipeline.get(),
+      .pipeline = _rasterPipeline.get(),
   });
 
-  loop_task_graph.submit({});
-  loop_task_graph.present({});
+  _renderTaskGraph.submit({});
+  _renderTaskGraph.present({});
 
   // we complete the task graph, which essentially compiles the
   // dependency graph between tasks, and inserts the most optimal
   // synchronization!
-  loop_task_graph.complete({});
+  _renderTaskGraph.complete({});
+}
 
-  // creating a vertex uploading graph
-  {
-    auto upload_task_graph = daxa::TaskGraph({
-        .device = _device,
-        .name   = "upload",
-    });
+Application::Application() : _window(std::make_unique<Window>("Mesh Decimation Test", 860, 640)) {
+  _init();
 
-    upload_task_graph.use_persistent_buffer(task_vertex_buffer);
+  _createTaskGraphs();
 
-    upload_task_graph.add_task(UploadVertexDataTask{
-        .uses =
-            {
-                .vertex_buffer = task_vertex_buffer.view(),
-            },
-    });
-
-    upload_task_graph.submit({});
-    upload_task_graph.complete({});
-
-    upload_task_graph.execute({});
-  }
+  _uploadTaskGraph.execute({});
 
   while (!_window->shouldClose()) {
     _window->update();
 
-    if (_window->swapchain_out_of_date) {
+    if (_window->getSwapchainOutOfDate()) {
       _swapchain.resize();
-      _window->swapchain_out_of_date = false;
+      _window->setSwapchainOutOfDate(false);
     }
 
     // acquire the next image
@@ -264,16 +275,16 @@ Application::Application() : _window(std::make_unique<Window>("Learn Daxa", 860,
     }
 
     // We update the image id of the task swapchain image.
-    task_swapchain_image.set_images({.images = std::span{&swapchain_image, 1}});
+    _taskSwapchainImage.set_images({.images = std::span{&swapchain_image, 1}});
 
     // So, now all we need to do is execute our task graph!
-    loop_task_graph.execute({});
+    _renderTaskGraph.execute({});
     _device.collect_garbage();
   }
 
   _device.wait_idle();
   _device.collect_garbage();
-  _device.destroy_buffer(_vertex_buffer_id);
+  _device.destroy_buffer(_vertexBufferId);
 }
 
 Application::~Application() = default;

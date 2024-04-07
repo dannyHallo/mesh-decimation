@@ -1,6 +1,6 @@
 #include "Window.hpp"
 
-Window::Window(char const *window_name, u32 sx, u32 sy) : width{sx}, height{sy} {
+Window::Window(char const *window_name, uint32_t sx, uint32_t sy) : _width{sx}, _height{sy} {
   // Initialize GLFW
   glfwInit();
 
@@ -11,11 +11,11 @@ Window::Window(char const *window_name, u32 sx, u32 sy) : width{sx}, height{sy} 
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   // Create the window
-  glfw_window_ptr = glfwCreateWindow(static_cast<i32>(width), static_cast<i32>(height), window_name,
-                                     nullptr, nullptr);
+  _glfwWindowPtr = glfwCreateWindow(static_cast<i32>(_width), static_cast<i32>(_height),
+                                    window_name, nullptr, nullptr);
 
   // Set the user pointer to this window
-  glfwSetWindowUserPointer(glfw_window_ptr, this);
+  glfwSetWindowUserPointer(_glfwWindowPtr, this);
 
   // Enable vsync (To limit the framerate to the refresh rate of the monitor)
   glfwSwapInterval(1);
@@ -23,37 +23,37 @@ Window::Window(char const *window_name, u32 sx, u32 sy) : width{sx}, height{sy} 
   // When the window is resized, update the width and height and mark the
   // swapchain as out of date
   glfwSetWindowContentScaleCallback(
-      glfw_window_ptr, [](GLFWwindow *window, float xscale, float yscale) {
-        auto *win                  = static_cast<Window *>(glfwGetWindowUserPointer(window));
-        win->width                 = static_cast<u32>(xscale);
-        win->height                = static_cast<u32>(yscale);
-        win->swapchain_out_of_date = true;
+      _glfwWindowPtr, [](GLFWwindow *window, float xscale, float yscale) {
+        auto *win                = static_cast<Window *>(glfwGetWindowUserPointer(window));
+        win->_width              = static_cast<uint32_t>(xscale);
+        win->_height             = static_cast<uint32_t>(yscale);
+        win->_swapchainOutOfDate = true;
       });
 }
 
 Window::~Window() {
-  glfwDestroyWindow(glfw_window_ptr);
+  glfwDestroyWindow(_glfwWindowPtr);
   glfwTerminate();
 }
 
 daxa::NativeWindowHandle Window::getNativeHandle() const {
-  return glfwGetWin32Window(glfw_window_ptr);
+  return glfwGetWin32Window(_glfwWindowPtr);
 }
 
 void Window::setMouseCapture(bool should_capture) const {
-  glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2.), static_cast<f64>(height / 2.));
-  glfwSetInputMode(glfw_window_ptr, GLFW_CURSOR,
+  glfwSetCursorPos(_glfwWindowPtr, static_cast<f64>(_width / 2.), static_cast<f64>(_height / 2.));
+  glfwSetInputMode(_glfwWindowPtr, GLFW_CURSOR,
                    should_capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-  glfwSetInputMode(glfw_window_ptr, GLFW_RAW_MOUSE_MOTION, should_capture);
+  glfwSetInputMode(_glfwWindowPtr, GLFW_RAW_MOUSE_MOTION, should_capture);
 }
 
-bool Window::shouldClose() const { return glfwWindowShouldClose(glfw_window_ptr); }
+bool Window::shouldClose() const { return glfwWindowShouldClose(_glfwWindowPtr); }
 
 void Window::update() const {
   glfwPollEvents();
-  glfwSwapBuffers(glfw_window_ptr);
+  glfwSwapBuffers(_glfwWindowPtr);
 }
 
-GLFWwindow *Window::getGlfwWindow() const { return glfw_window_ptr; }
+GLFWwindow *Window::getGlfwWindow() const { return _glfwWindowPtr; }
 
-bool Window::shouldClose() { return glfwWindowShouldClose(glfw_window_ptr); }
+bool Window::shouldClose() { return glfwWindowShouldClose(_glfwWindowPtr); }
