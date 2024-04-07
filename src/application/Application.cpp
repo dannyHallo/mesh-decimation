@@ -17,29 +17,28 @@ struct UploadVertexDataTask {
 
   void callback(daxa::TaskInterface ti) {
     auto commandList = ti.get_command_list();
-    auto data = std::array{
+    auto data        = std::array{
         MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
         MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
         MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
     };
 
     auto staging_buffer_id = ti.get_device().create_buffer({
-        .size = sizeof(data),
+        .size          = sizeof(data),
         .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-        .name = "my staging buffer",
+        .name          = "my staging buffer",
     });
 
     commandList.destroy_buffer_deferred(staging_buffer_id);
 
     auto *buffer_ptr =
-        ti.get_device().get_host_address_as<std::array<MyVertex, 3>>(
-            staging_buffer_id);
+        ti.get_device().get_host_address_as<std::array<MyVertex, 3>>(staging_buffer_id);
 
     *buffer_ptr = data;
     commandList.copy_buffer_to_buffer({
         .src_buffer = staging_buffer_id,
         .dst_buffer = uses.vertex_buffer.buffer(),
-        .size = sizeof(data),
+        .size       = sizeof(data),
     });
   }
 };
@@ -64,19 +63,16 @@ struct DrawToSwapchainTask {
   void callback(daxa::TaskInterface ti) {
     auto commandList = ti.get_command_list();
 
-    auto const size_x =
-        ti.get_device().info_image(uses.color_target.image()).size.x;
-    auto const size_y =
-        ti.get_device().info_image(uses.color_target.image()).size.y;
+    auto const size_x = ti.get_device().info_image(uses.color_target.image()).size.x;
+    auto const size_y = ti.get_device().info_image(uses.color_target.image()).size.y;
 
     commandList.begin_renderpass({
         .color_attachments =
             std::vector{
                 daxa::RenderAttachmentInfo{
-                    .image_view = uses.color_target.view(),
-                    .load_op = daxa::AttachmentLoadOp::CLEAR,
-                    .clear_value =
-                        std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
+                    .image_view  = uses.color_target.view(),
+                    .load_op     = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
                 },
             },
         .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
@@ -84,8 +80,7 @@ struct DrawToSwapchainTask {
 
     commandList.set_pipeline(*pipeline);
     commandList.push_constant(MyPushConstant{
-        .my_vertex_ptr =
-            ti.get_device().get_device_address(uses.vertex_buffer.buffer())});
+        .my_vertex_ptr = ti.get_device().get_device_address(uses.vertex_buffer.buffer())});
     commandList.draw({.vertex_count = 3});
     commandList.end_renderpass();
   }
@@ -119,8 +114,7 @@ void Application::_createDevice() {
         default:
           break;
         }
-        score += static_cast<daxa::i32>(
-            device_props.limits.max_memory_allocation_count / 100000);
+        score += static_cast<daxa::i32>(device_props.limits.max_memory_allocation_count / 100000);
         return score;
       },
       .name = "my device",
@@ -150,8 +144,8 @@ void Application::_createSwapchain() {
             }
           },
       .present_mode = daxa::PresentMode::MAILBOX,
-      .image_usage = daxa::ImageUsageFlagBits::TRANSFER_DST,
-      .name = "my swapchain",
+      .image_usage  = daxa::ImageUsageFlagBits::TRANSFER_DST,
+      .name         = "my swapchain",
   });
 }
 
@@ -166,7 +160,7 @@ void Application::_createPipelineManager() {
                       "C:/Users/danny/Desktop/mesh-decimation/src/shaders",
                       "C:/Users/danny/Desktop/mesh-decimation/src/shared",
                   },
-              .language = daxa::ShaderLanguage::GLSL,
+              .language          = daxa::ShaderLanguage::GLSL,
               .enable_debug_info = true,
           },
       .name = "my pipeline manager",
@@ -175,14 +169,12 @@ void Application::_createPipelineManager() {
 
 void Application::_createRasterPipeline() {
   auto result = _pipeline_manager.add_raster_pipeline({
-      .vertex_shader_info =
-          daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
-      .fragment_shader_info =
-          daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
-      .color_attachments = {{.format = _swapchain.get_format()}},
-      .raster = {},
-      .push_constant_size = sizeof(MyPushConstant),
-      .name = "my pipeline",
+      .vertex_shader_info   = daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
+      .fragment_shader_info = daxa::ShaderCompileInfo{.source = daxa::ShaderFile{"main.glsl"}},
+      .color_attachments    = {{.format = _swapchain.get_format()}},
+      .raster               = {},
+      .push_constant_size   = sizeof(MyPushConstant),
+      .name                 = "my pipeline",
   });
   if (result.is_err()) {
     std::cerr << result.message() << std::endl;
@@ -198,22 +190,21 @@ void Application::_createBuffers() {
   });
 }
 
-Application::Application()
-    : _window(std::make_unique<Window>("Learn Daxa", 860, 640)) {
+Application::Application() : _window(std::make_unique<Window>("Learn Daxa", 860, 640)) {
   _init();
 
   auto task_swapchain_image =
-      daxa::TaskImage{{.swapchain_image = true, .name = "swapchain image"}};
+      daxa::TaskImage{daxa::TaskImageInfo{.swapchain_image = true, .name = "swapchain image"}};
 
   auto task_vertex_buffer = daxa::TaskBuffer({
       .initial_buffers = {.buffers = std::span{&_vertex_buffer_id, 1}},
-      .name = "task vertex buffer",
+      .name            = "task vertex buffer",
   });
 
   auto loop_task_graph = daxa::TaskGraph({
-      .device = _device,
+      .device    = _device,
       .swapchain = _swapchain,
-      .name = "loop",
+      .name      = "loop",
   });
 
   loop_task_graph.use_persistent_buffer(task_vertex_buffer);
@@ -223,15 +214,15 @@ Application::Application()
       .uses =
           {
               .vertex_buffer = task_vertex_buffer.view(),
-              .color_target = task_swapchain_image.view(),
+              .color_target  = task_swapchain_image.view(),
           },
       .pipeline = _raster_pipeline.get(),
   });
 
   loop_task_graph.submit({});
-  // And tell the task graph to do the present step.
   loop_task_graph.present({});
-  // Finally, we complete the task graph, which essentially compiles the
+
+  // we complete the task graph, which essentially compiles the
   // dependency graph between tasks, and inserts the most optimal
   // synchronization!
   loop_task_graph.complete({});
@@ -240,7 +231,7 @@ Application::Application()
   {
     auto upload_task_graph = daxa::TaskGraph({
         .device = _device,
-        .name = "upload",
+        .name   = "upload",
     });
 
     upload_task_graph.use_persistent_buffer(task_vertex_buffer);

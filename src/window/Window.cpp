@@ -1,7 +1,6 @@
 #include "Window.hpp"
 
-Window::Window(char const *window_name, u32 sx, u32 sy)
-    : width{sx}, height{sy} {
+Window::Window(char const *window_name, u32 sx, u32 sy) : width{sx}, height{sy} {
   // Initialize GLFW
   glfwInit();
 
@@ -12,9 +11,8 @@ Window::Window(char const *window_name, u32 sx, u32 sy)
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
   // Create the window
-  glfw_window_ptr =
-      glfwCreateWindow(static_cast<i32>(width), static_cast<i32>(height),
-                       window_name, nullptr, nullptr);
+  glfw_window_ptr = glfwCreateWindow(static_cast<i32>(width), static_cast<i32>(height), window_name,
+                                     nullptr, nullptr);
 
   // Set the user pointer to this window
   glfwSetWindowUserPointer(glfw_window_ptr, this);
@@ -26,9 +24,9 @@ Window::Window(char const *window_name, u32 sx, u32 sy)
   // swapchain as out of date
   glfwSetWindowContentScaleCallback(
       glfw_window_ptr, [](GLFWwindow *window, float xscale, float yscale) {
-        auto *win = static_cast<Window *>(glfwGetWindowUserPointer(window));
-        win->width = static_cast<u32>(xscale);
-        win->height = static_cast<u32>(yscale);
+        auto *win                  = static_cast<Window *>(glfwGetWindowUserPointer(window));
+        win->width                 = static_cast<u32>(xscale);
+        win->height                = static_cast<u32>(yscale);
         win->swapchain_out_of_date = true;
       });
 }
@@ -43,16 +41,13 @@ daxa::NativeWindowHandle Window::getNativeHandle() const {
 }
 
 void Window::setMouseCapture(bool should_capture) const {
-  glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2.),
-                   static_cast<f64>(height / 2.));
+  glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2.), static_cast<f64>(height / 2.));
   glfwSetInputMode(glfw_window_ptr, GLFW_CURSOR,
                    should_capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
   glfwSetInputMode(glfw_window_ptr, GLFW_RAW_MOUSE_MOTION, should_capture);
 }
 
-bool Window::shouldClose() const {
-  return glfwWindowShouldClose(glfw_window_ptr);
-}
+bool Window::shouldClose() const { return glfwWindowShouldClose(glfw_window_ptr); }
 
 void Window::update() const {
   glfwPollEvents();

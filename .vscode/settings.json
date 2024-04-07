@@ -18,5 +18,5 @@
     // enable clang tidy
     "--clang-tidy"
   ],
-  "shaderc-lint.glslcArgs": "--target-spv=spv1.5"
+  "shaderc-lint.glslcArgs": "--target-spv=spv1.5 -I./build/Release/vcpkg_installed/x64-windows/include/ -I./src/shared/"
 }

@@ -4,9 +4,7 @@
 // Enabled the extension GL_EXT_debug_printf
 #extension GL_EXT_debug_printf : enable
 
-// Includes our shared types we created earlier
-// #include <shared.inl>
-#include <PushConstants.inl>
+#include "PushConstants.inl"
 
 // Enabled the push constant MyPushConstant we specified in shared.inl
 DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
@@ -28,8 +26,8 @@ layout(location = 0) in daxa_f32vec3 v_col;
 layout(location = 0) out daxa_f32vec4 color;
 void main()
 {
-    // color = daxa_f32vec4(v_col, 1);
-    color = daxa_f32vec4(1, 0, 0, 1);
+    color = daxa_f32vec4(v_col, 1);
+    // color = daxa_f32vec4(1, 0, 0, 1);
     debugPrintfEXT("test\n");
 }
 

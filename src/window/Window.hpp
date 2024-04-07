@@ -13,7 +13,7 @@ using HWND = void *;
 struct Window {
   GLFWwindow *glfw_window_ptr;
   u32 width, height;
-  bool minimized = false;
+  bool minimized             = false;
   bool swapchain_out_of_date = false;
 
   explicit Window(char const *window_name, u32 sx = 800, u32 sy = 600);

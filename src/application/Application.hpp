@@ -14,10 +14,10 @@ public:
   ~Application();
 
   // disable copy and move
-  Application(Application const &) = delete;
-  Application(Application &&) = delete;
+  Application(Application const &)            = delete;
+  Application(Application &&)                 = delete;
   Application &operator=(Application const &) = delete;
-  Application &operator=(Application &&) = delete;
+  Application &operator=(Application &&)      = delete;
 
   void run();
 
