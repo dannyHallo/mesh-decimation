@@ -35,11 +35,11 @@ private:
   std::shared_ptr<daxa::RasterPipeline> _rasterPipeline;
 
   daxa::BufferId _vertexBufferId;
-  daxa::BufferId _cameraTransformBufferId;
+  daxa::BufferId _uboBufferId;
 
   daxa::TaskImage _taskSwapchainImage;
   daxa::TaskBuffer _taskVertexBuffer;
-  daxa::TaskBuffer _taskCameraTransformBuffer;
+  daxa::TaskBuffer _taskUboBuffer;
 
   daxa::TaskGraph _uploadTaskGraph;
   daxa::TaskGraph _renderTaskGraph;

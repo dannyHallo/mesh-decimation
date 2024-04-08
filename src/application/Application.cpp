@@ -33,19 +33,19 @@ struct UploadVertexDataTask {
 
     size_t vertexCount = uses.model->vertices.size();
 
-    auto data = std::vector<MyVertex>{};
+    auto data = std::vector<G_Vertex>{};
     data.reserve(vertexCount);
     for (auto const &vertex : uses.model->vertices) {
       data.push_back(vertex);
     }
 
     // auto data = std::array{
-    //     MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-    //     MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-    //     MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+    //     G_Vertex{.position = {-0.5f, +0.5f, 0.F}, .color = {1.F, 0.F, 0.F}},
+    //     G_Vertex{.position = {+0.5f, +0.5f, 0.F}, .color = {0.F, 1.F, 0.F}},
+    //     G_Vertex{.position = {+0.F, -0.5f, 0.F}, .color = {0.F, 0.F, 1.F}},
     // };
 
-    u32 size = sizeof(MyVertex) * data.size();
+    u32 size = sizeof(G_Vertex) * data.size();
     std::cout << "Size: " << size << std::endl;
 
     auto stagingBufferId = ti.get_device().create_buffer({
@@ -56,7 +56,8 @@ struct UploadVertexDataTask {
 
     commandList.destroy_buffer_deferred(stagingBufferId);
 
-    auto *bufferPtr = ti.get_device().get_host_address_as<MyVertex *>(stagingBufferId);
+    // TODO: fix me
+    auto *bufferPtr = ti.get_device().get_host_address_as<G_Vertex *>(stagingBufferId);
 
     memcpy(bufferPtr, data.data(), size);
 
@@ -76,15 +77,15 @@ struct DrawToSwapchainTask {
 
     // We declare a vertex buffer read. Later we assign the task vertex buffer
     // handle to this use.
-    daxa::BufferVertexShaderRead vertex_buffer{};
-    daxa::BufferVertexShaderRead camera_transform_buffer{};
+    daxa::BufferVertexShaderRead vertexBuffer{};
+    daxa::BufferVertexShaderRead uboBuffer{};
 
     // We declare a color target. We will assign the swapchain task image to
     // this later. The name `ImageColorAttachment<T_VIEW_TYPE = DEFAULT>` is a
     // typedef for
     // `daxa::TaskImageUse<daxa::TaskImageAccess::COLOR_ATTACHMENT,
     // T_VIEW_TYPE>`.
-    daxa::ImageColorAttachment<> color_target{};
+    daxa::ImageColorAttachment<> colorTarget{};
   } uses = {};
 
   daxa::RasterPipeline *pipeline = {};
@@ -95,12 +96,18 @@ struct DrawToSwapchainTask {
     auto commandList = ti.get_command_list();
 
     // TODO: fix me
-    auto pMat  = uses.camera->getProjectionMatrix(860.0f / 640.0f);
+    auto pMat  = uses.camera->getProjectionMatrix(860.F / 640.F);
     auto vMat  = uses.camera->getViewMatrix();
     auto vpMat = pMat * vMat;
-    // auto vpMat = glm::mat4(1.0f);
 
-    auto data = MyCameraTransform{.vpMat = toDaxaMat4x4(vpMat)};
+    auto modelRotMat  = glm::rotate(glm::mat4(1.F), glm::radians(-90.F), glm::vec3(1.F, 0.F, 0.F));
+    auto modelRotMat2 = glm::rotate(glm::mat4(1.F), glm::radians(225.F), glm::vec3(0.F, 1.F, 0.F));
+    auto modelTranslateMat = glm::translate(glm::mat4(1.F), glm::vec3(0.F, 0.F, 0.F));
+
+    auto data = G_Ubo{
+        .vpMat    = toDaxaMat4x4(vpMat),
+        .modelMat = toDaxaMat4x4(modelTranslateMat * modelRotMat2 * modelRotMat),
+    };
 
     auto stagingBufferId = ti.get_device().create_buffer({
         .size          = sizeof(data),
@@ -110,35 +117,34 @@ struct DrawToSwapchainTask {
 
     commandList.destroy_buffer_deferred(stagingBufferId);
 
-    auto *bufferPtr = ti.get_device().get_host_address_as<MyCameraTransform>(stagingBufferId);
+    auto *bufferPtr = ti.get_device().get_host_address_as<G_Ubo>(stagingBufferId);
 
     *bufferPtr = data;
     commandList.copy_buffer_to_buffer({
         .src_buffer = stagingBufferId,
-        .dst_buffer = uses.camera_transform_buffer.buffer(),
+        .dst_buffer = uses.uboBuffer.buffer(),
         .size       = sizeof(data),
     });
 
-    auto const size_x = ti.get_device().info_image(uses.color_target.image()).size.x;
-    auto const size_y = ti.get_device().info_image(uses.color_target.image()).size.y;
+    auto const size_x = ti.get_device().info_image(uses.colorTarget.image()).size.x;
+    auto const size_y = ti.get_device().info_image(uses.colorTarget.image()).size.y;
 
     commandList.begin_renderpass({
         .color_attachments =
             std::vector{
                 daxa::RenderAttachmentInfo{
-                    .image_view  = uses.color_target.view(),
+                    .image_view  = uses.colorTarget.view(),
                     .load_op     = daxa::AttachmentLoadOp::CLEAR,
-                    .clear_value = std::array<daxa::f32, 4>{0.1f, 0.0f, 0.5f, 1.0f},
+                    .clear_value = std::array<daxa::f32, 4>{0.1f, 0.F, 0.5f, 1.F},
                 },
             },
         .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
     });
 
     commandList.set_pipeline(*pipeline);
-    commandList.push_constant(MyPushConstant{
-        .my_vertex_ptr = ti.get_device().get_device_address(uses.vertex_buffer.buffer()),
-        .my_camera_transform_ptr =
-            ti.get_device().get_device_address(uses.camera_transform_buffer.buffer())});
+    commandList.push_constant(
+        MyPushConstant{.vertexPtr = ti.get_device().get_device_address(uses.vertexBuffer.buffer()),
+                       .uboPtr    = ti.get_device().get_device_address(uses.uboBuffer.buffer())});
 
     commandList.draw(daxa::DrawInfo{.vertex_count = uses.modelVertCount});
     commandList.end_renderpass();
@@ -248,27 +254,22 @@ void Application::_createRasterPipeline() {
 void Application::_loadModel(std::string const &&path) {
   _model = std::make_unique<MyModel>(ObjectLoader::loadObjModel(std::move(path)));
 
-  std::cout << "Model has " << _model->vertices.size() << " vertices and " << _model->indices.size()
-            << " indices." << std::endl;
-
   size_t vertexCount = _model->vertices.size();
   // print at most the first 10 vertices
   for (size_t i = 0; i < std::min(vertexCount, static_cast<size_t>(10)); ++i) {
     auto const &vertex = _model->vertices[i];
-    std::cout << "Vertex " << i << ": " << vertex.position.x << ", " << vertex.position.y << ", "
-              << vertex.position.z << std::endl;
   }
 }
 
 void Application::_createBuffers() {
   _vertexBufferId = _device.create_buffer({
-      .size = static_cast<u32>(sizeof(MyVertex) * _model->vertices.size()),
-      .name = "my vertex data",
+      .size = static_cast<u32>(sizeof(G_Vertex) * _model->vertices.size()),
+      .name = "vertex buffers - data of vertices",
   });
 
-  _cameraTransformBufferId = _device.create_buffer({
-      .size = sizeof(MyCameraTransform),
-      .name = "my camera transform",
+  _uboBufferId = _device.create_buffer({
+      .size = sizeof(G_Ubo),
+      .name = "ubo buffer - all the small bindings",
   });
 }
 
@@ -287,9 +288,9 @@ void Application::_createTaskResources() {
       .name            = "task vertex buffer",
   });
 
-  _taskCameraTransformBuffer = daxa::TaskBuffer({
-      .initial_buffers = {.buffers = std::span{&_cameraTransformBufferId, 1}},
-      .name            = "task camera transform buffer",
+  _taskUboBuffer = daxa::TaskBuffer({
+      .initial_buffers = {.buffers = std::span{&_uboBufferId, 1}},
+      .name            = "task ubo buffer",
   });
 }
 
@@ -321,17 +322,17 @@ void Application::_createRenderTaskGraph() {
   });
 
   _renderTaskGraph.use_persistent_buffer(_taskVertexBuffer);
-  _renderTaskGraph.use_persistent_buffer(_taskCameraTransformBuffer);
+  _renderTaskGraph.use_persistent_buffer(_taskUboBuffer);
   _renderTaskGraph.use_persistent_image(_taskSwapchainImage);
 
   _renderTaskGraph.add_task(DrawToSwapchainTask{
       .uses =
           {
-              .camera                  = _camera.get(),
-              .modelVertCount          = static_cast<u32>(_model->vertices.size()),
-              .vertex_buffer           = _taskVertexBuffer.view(),
-              .camera_transform_buffer = _taskCameraTransformBuffer.view(),
-              .color_target            = _taskSwapchainImage.view(),
+              .camera         = _camera.get(),
+              .modelVertCount = static_cast<u32>(_model->vertices.size()),
+              .vertexBuffer   = _taskVertexBuffer.view(),
+              .uboBuffer      = _taskUboBuffer.view(),
+              .colorTarget    = _taskSwapchainImage.view(),
           },
       .pipeline = _rasterPipeline.get(),
   });
@@ -357,7 +358,7 @@ Application::Application() : _window(std::make_unique<Window>("Mesh Decimation T
 
 Application::~Application() {
   _device.destroy_buffer(_vertexBufferId);
-  _device.destroy_buffer(_cameraTransformBufferId);
+  _device.destroy_buffer(_uboBufferId);
 }
 
 void Application::run() {

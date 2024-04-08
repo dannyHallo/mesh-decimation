@@ -15,11 +15,11 @@ DAXA_DECL_PUSH_CONSTANT(MyPushConstant, push)
 layout(location = 0) out daxa_f32vec3 v_col;
 void main()
 {
-    MyVertex vert = deref(push.my_vertex_ptr[gl_VertexIndex]);
+    G_Vertex vert = deref(push.vertexPtr[gl_VertexIndex]);
     
-    MyCameraTransform transform = deref(push.my_camera_transform_ptr);
+    G_Ubo ubo = deref(push.uboPtr);
     
-    gl_Position = transform.vpMat * daxa_f32vec4(vert.position, 1);
+    gl_Position = ubo.vpMat * ubo.modelMat * daxa_f32vec4(vert.position, 1);
     v_col = vert.color;
 }
 

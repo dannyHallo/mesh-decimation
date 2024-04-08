@@ -6,7 +6,7 @@
 #include <string>
 
 struct MyModel {
-  std::vector<MyVertex> vertices;
+  std::vector<G_Vertex> vertices;
   std::vector<size_t> indices;
 };
 

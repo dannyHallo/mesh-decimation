@@ -5,6 +5,12 @@ namespace {
 float constexpr kMovementSpeed    = .4F;
 float constexpr kMouseSensitivity = 0.06F;
 
+// Create a matrix to convert from OpenGL to Vulkan coordinate systems
+glm::mat4 const vulkanClipMatrix =
+    glm::mat4(1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, // Flip Y axis
+              0.0f, 0.0f, 0.5f, 0.0f,                          // Adjust Z axis (depth)
+              0.0f, 0.0f, 0.5f, 1.0f);                         // Adjust Z axis (depth)
+
 } // namespace
 
 glm::mat4 Camera::getViewMatrix() const {
@@ -14,6 +20,7 @@ glm::mat4 Camera::getViewMatrix() const {
 
 glm::mat4 Camera::getProjectionMatrix(float aspectRatio, float zNear, float zFar) const {
   auto mat =
+      vulkanClipMatrix *
       glm::perspective(glm::radians(_fov), // The vertical Field of View, in radians: the amount
                                            // of "zoom". Think "camera lens". Usually between
                                            // 90° (extra wide) and 30° (quite zoomed in)
@@ -81,7 +88,7 @@ void Camera::handleMouseMovement(float xoffset, float yoffset) {
   yoffset *= -kMouseSensitivity;
 
   _yaw += xoffset;
-  _pitch += yoffset;
+  _pitch -= yoffset;
 
   constexpr float cameraLim = 89.9F;
   // make sure that when mPitch is out of bounds, screen doesn't get flipped

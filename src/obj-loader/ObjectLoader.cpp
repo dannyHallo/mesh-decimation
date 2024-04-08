@@ -22,10 +22,10 @@ MyModel loadObjModel(std::string const &&path) {
 
   MyModel model;
   for (const auto &shape : shapes) {
-    std::cout << "Shape " << shape.name << " has " << shape.mesh.indices.size() << " indices"
+    std::cout << "Shape \"" << shape.name << "\" has " << shape.mesh.indices.size() << " indices"
               << std::endl;
     for (const auto &index : shape.mesh.indices) {
-      MyVertex vertex{};
+      G_Vertex vertex{};
 
       vertex.position = {attrib.vertices[3 * index.vertex_index + 0],
                          attrib.vertices[3 * index.vertex_index + 1],
