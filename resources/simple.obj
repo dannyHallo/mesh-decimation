@@ -1,0 +1,8 @@
+# Simple OBJ file generated
+
+v -0.5 0.5 0.0
+v 0.5 0.5 0.0
+v 0.0 -0.5 0.0
+
+# Face Definitions
+f 1 2 3

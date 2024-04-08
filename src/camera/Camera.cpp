@@ -1,10 +1,8 @@
 #include "Camera.hpp"
 
-#include <iostream>
-
 namespace {
 
-float constexpr kMovementSpeed    = .2F;
+float constexpr kMovementSpeed    = .4F;
 float constexpr kMouseSensitivity = 0.06F;
 
 } // namespace

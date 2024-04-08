@@ -3,7 +3,6 @@
 #include "window/Window.hpp"
 
 #include "camera/Camera.hpp"
-#include "obj-loader/ObjectLoader.hpp"
 #include "shared/PushConstants.inl"
 
 #include <chrono>
@@ -23,6 +22,7 @@ daxa::types::f32mat4x4 toDaxaMat4x4(glm::mat4 const &mat) {
 
 struct UploadVertexDataTask {
   struct Uses {
+    MyModel *model;
     daxa::BufferTransferWrite vertexBuffer{};
   } uses = {};
 
@@ -30,27 +30,40 @@ struct UploadVertexDataTask {
 
   void callback(daxa::TaskInterface ti) {
     auto commandList = ti.get_command_list();
-    auto data        = std::array{
-        MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-        MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
-        MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-    };
+
+    size_t vertexCount = uses.model->vertices.size();
+
+    auto data = std::vector<MyVertex>{};
+    data.reserve(vertexCount);
+    for (auto const &vertex : uses.model->vertices) {
+      data.push_back(vertex);
+    }
+
+    // auto data = std::array{
+    //     MyVertex{.position = {-0.5f, +0.5f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+    //     MyVertex{.position = {+0.5f, +0.5f, 0.0f}, .color = {0.0f, 1.0f, 0.0f}},
+    //     MyVertex{.position = {+0.0f, -0.5f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+    // };
+
+    u32 size = sizeof(MyVertex) * data.size();
+    std::cout << "Size: " << size << std::endl;
 
     auto stagingBufferId = ti.get_device().create_buffer({
-        .size          = sizeof(data),
+        .size          = size,
         .allocate_info = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
         .name          = "my staging buffer",
     });
 
     commandList.destroy_buffer_deferred(stagingBufferId);
 
-    auto *bufferPtr = ti.get_device().get_host_address_as<std::array<MyVertex, 3>>(stagingBufferId);
+    auto *bufferPtr = ti.get_device().get_host_address_as<MyVertex *>(stagingBufferId);
 
-    *bufferPtr = data;
+    memcpy(bufferPtr, data.data(), size);
+
     commandList.copy_buffer_to_buffer({
         .src_buffer = stagingBufferId,
         .dst_buffer = uses.vertexBuffer.buffer(),
-        .size       = sizeof(data),
+        .size       = size,
     });
   }
 };
@@ -58,6 +71,8 @@ struct UploadVertexDataTask {
 struct DrawToSwapchainTask {
   struct Uses {
     Camera *camera;
+
+    u32 modelVertCount;
 
     // We declare a vertex buffer read. Later we assign the task vertex buffer
     // handle to this use.
@@ -125,7 +140,7 @@ struct DrawToSwapchainTask {
         .my_camera_transform_ptr =
             ti.get_device().get_device_address(uses.camera_transform_buffer.buffer())});
 
-    commandList.draw(daxa::DrawInfo{.vertex_count = 3});
+    commandList.draw(daxa::DrawInfo{.vertex_count = uses.modelVertCount});
     commandList.end_renderpass();
   }
 };
@@ -136,7 +151,10 @@ void Application::_init() {
   _createSwapchain();
   _createPipelineManager();
   _createRasterPipeline();
+
+  _loadModel("C:/Users/danny/Desktop/mesh-decimation/resources/viking_room.obj");
   _createBuffers();
+  _createTaskGraphs();
 }
 
 void Application::_createInstance() { _instance = daxa::create_instance({}); }
@@ -227,9 +245,24 @@ void Application::_createRasterPipeline() {
   _rasterPipeline = result.value();
 }
 
+void Application::_loadModel(std::string const &&path) {
+  _model = std::make_unique<MyModel>(ObjectLoader::loadObjModel(std::move(path)));
+
+  std::cout << "Model has " << _model->vertices.size() << " vertices and " << _model->indices.size()
+            << " indices." << std::endl;
+
+  size_t vertexCount = _model->vertices.size();
+  // print at most the first 10 vertices
+  for (size_t i = 0; i < std::min(vertexCount, static_cast<size_t>(10)); ++i) {
+    auto const &vertex = _model->vertices[i];
+    std::cout << "Vertex " << i << ": " << vertex.position.x << ", " << vertex.position.y << ", "
+              << vertex.position.z << std::endl;
+  }
+}
+
 void Application::_createBuffers() {
   _vertexBufferId = _device.create_buffer({
-      .size = sizeof(MyVertex) * 3,
+      .size = static_cast<u32>(sizeof(MyVertex) * _model->vertices.size()),
       .name = "my vertex data",
   });
 
@@ -271,6 +304,7 @@ void Application::_createUploadTaskGraph() {
   _uploadTaskGraph.add_task(UploadVertexDataTask{
       .uses =
           {
+              .model        = _model.get(),
               .vertexBuffer = _taskVertexBuffer.view(),
           },
   });
@@ -294,6 +328,7 @@ void Application::_createRenderTaskGraph() {
       .uses =
           {
               .camera                  = _camera.get(),
+              .modelVertCount          = static_cast<u32>(_model->vertices.size()),
               .vertex_buffer           = _taskVertexBuffer.view(),
               .camera_transform_buffer = _taskCameraTransformBuffer.view(),
               .color_target            = _taskSwapchainImage.view(),
@@ -310,15 +345,6 @@ void Application::_createRenderTaskGraph() {
   _renderTaskGraph.complete({});
 }
 
-void Application::_loadModel() {
-  auto model = ObjectLoader::loadObjModel(
-      "C:/Users/danny/Desktop/mesh-decimation/resources/viking_room.obj");
-
-  // print its stats
-  std::cout << "Model has " << model.vertices.size() << " vertices and " << model.indices.size()
-            << " indices." << std::endl;
-}
-
 Application::Application() : _window(std::make_unique<Window>("Mesh Decimation Test", 860, 640)) {
   _camera = std::make_unique<Camera>(_window.get());
 
@@ -327,11 +353,6 @@ Application::Application() : _window(std::make_unique<Window>("Mesh Decimation T
   });
 
   _init();
-
-  // testing
-  _loadModel();
-
-  _createTaskGraphs();
 }
 
 Application::~Application() {
